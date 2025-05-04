@@ -89,7 +89,7 @@ def login(request: Request, response: Response, data: OAuth2PasswordRequestForm 
 
     return { "message": "Login successfully 😉" }
 
-@router.delete("/logout",
+@router.post("/logout",
              summary="Logout from service")
 def logout(request: Request, response: Response) -> dict:
     if check_logged(request):  # If user is logged in

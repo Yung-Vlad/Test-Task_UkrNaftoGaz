@@ -1,4 +1,5 @@
 import re
+from zxcvbn import zxcvbn
 
 
 class Validator:
@@ -10,6 +11,8 @@ class Validator:
             return "Password must contain number(s)!"
         elif not bool(re.search(r"[A-Za-z]", password)):  # Exists letters
             return "Password must contain letter(s)!"
+        elif zxcvbn(password)["score"] < 2:  # Password strength
+            return "Password is too easy!"
 
         return None
 

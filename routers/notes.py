@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 
 from typing import Optional
+from datetime import datetime
 
 from secure.tokens import JWT, CSRF
-from models.notes import NoteModel, NoteUpdateModel
+from models.notes import NoteModel, NoteUpdateModel, NoteInternalModel, NoteUpdateInternalModel
 from cipher.encrypting import encrypt_note
 from cipher.decrypting import decrypt_note
 from database.users import get_public_key
@@ -25,6 +26,7 @@ def create_note(note: NoteModel,
 
     user_id = curr_user["id"]
     public_key = get_public_key(user_id)
+    note = NoteInternalModel(**note.dict(), created_time=datetime.now().strftime("%H:%M:%S %d-%m-%Y"))
 
     add_note(encrypt_note(public_key, note), user_id)
 
@@ -45,6 +47,9 @@ def get_notes(curr_user: dict = Depends(JWT.get_current_user),
 
     # Get all encrypted notes
     notes = get_all_notes(user_id, offset, limit, tags)
+    if "message" in notes.keys():  # If no notes
+        return notes
+
     decrypted_notes = {}
 
     # Decrypted receiver notes
@@ -90,5 +95,6 @@ def editing_note(note: NoteUpdateModel,
 
     user_id = curr_user["id"]
     public_key = get_public_key(user_id)
+    note = NoteUpdateInternalModel(**note.dict(), last_edit_time=datetime.now().strftime("%H:%M:%S %d-%m-%Y"), last_edit_user=user_id)
 
     return update_note(encrypt_note(public_key, note))

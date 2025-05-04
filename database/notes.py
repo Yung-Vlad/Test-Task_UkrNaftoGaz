@@ -1,11 +1,11 @@
 import sqlite3
-from models.notes import NoteModel, NoteUpdateModel
+from models.notes import NoteInternalModel, NoteUpdateInternalModel
 from typing import Optional
 
 from .general import DB_PATH
 
 
-def add_note(note: NoteModel, from_user: int) -> None:
+def add_note(note: NoteInternalModel, from_user: int) -> None:
     """
     Add new note to db
     :param note: all info about this note (header, content, tags)
@@ -16,8 +16,8 @@ def add_note(note: NoteModel, from_user: int) -> None:
         cursor = conn.cursor()
 
         cursor.execute("""
-            INSERT INTO notes (header, content, tags, from_user_id) VALUES (?, ?, ?, ?)
-        """, (note.header, note.text, note.tags, from_user))
+            INSERT INTO notes (header, content, tags, created_time, from_user_id) VALUES (?, ?, ?, ?, ?)
+        """, (note.header, note.text, note.tags, note.created_time, from_user))
         conn.commit()
 
         # Increment counter for creating notes
@@ -64,7 +64,9 @@ def get_all_notes(user_id: int, offset: int, limit: int, tags: Optional[str]) ->
         conn.commit()
 
         # Return dictionary in understandable format
-        return { item[0]: { "header": item[1], "content": item[2], "tags": item[3] } for item in data }
+        return { item[0]: { "header": item[1], "content": item[2], "tags": item[3], "from_user_id": item[4],
+                            "created_time": item[5], "last_edit_time": item[6], "last_edit_user": item[7] }
+                 for item in data }
 
 def get_note_by_id(note_id: int, user_id: int) -> dict:
     """
@@ -90,7 +92,8 @@ def get_note_by_id(note_id: int, user_id: int) -> dict:
                         """, (user_id,))
         conn.commit()
 
-        return { "id": data[0], "header": data[1], "content": data[2], "tags": data[3], "from_user_id": data[4] }
+        return { "id": data[0], "header": data[1], "content": data[2], "tags": data[3], "from_user_id": data[4],
+                 "created_time": data[5], "last_edit_time": data[6], "last_edit_user": data[7] }
 
 def delete_note_by_id(note_id: int, user_id: int) -> dict:
     """
@@ -139,7 +142,7 @@ def check_access(note_id: int, user_id: int) -> bool:
 
         return bool(cursor.fetchone())
 
-def update_note(note: NoteUpdateModel) -> dict:
+def update_note(note: NoteUpdateInternalModel) -> dict:
     """
     Update note in db after editing
     """
@@ -148,8 +151,8 @@ def update_note(note: NoteUpdateModel) -> dict:
         cursor = conn.cursor()
 
         cursor.execute("""
-            UPDATE notes SET header = ?, content = ?, tags = ? WHERE id = ?
-        """, (note.header, note.text, note.tags, note.id))
+            UPDATE notes SET header = ?, content = ?, tags = ?, last_edit_time = ?, last_edit_user = ? WHERE id = ?
+        """, (note.header, note.text, note.tags, note.last_edit_time, note.id, note.last_edit_user))
         conn.commit()
 
         return { "message": "Note has successfully updated" }

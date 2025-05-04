@@ -1,7 +1,6 @@
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization, hashes
 
-from models.notes import NoteModel
 from cipher.generate import KEYS_PATH
 
 

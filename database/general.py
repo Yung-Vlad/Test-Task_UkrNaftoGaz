@@ -35,6 +35,9 @@ def init_db() -> None:
                         content TEXT NOT NULL,
                         tags TEXT,
                         from_user_id INTEGER NOT NULL,
+                        created_time TEXT NOT NULL,
+                        last_edit_time TEXT,
+                        last_edit_user INTEGER,
                         FOREIGN KEY (from_user_id) REFERENCES users(id)
                     );
                 """)

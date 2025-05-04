@@ -1,7 +1,7 @@
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization, hashes
 
-from models.notes import NoteModel, NoteUpdateModel
+from models.notes import NoteInternalModel, NoteUpdateInternalModel
 
 
 # Encrypting data by public key
@@ -21,7 +21,7 @@ def encrypt_data(public_pem: bytes, data: str) -> bytes:
     return encrypted_data
 
 # Encrypting note
-def encrypt_note(public_pem: bytes, note: NoteModel | NoteUpdateModel) -> NoteModel | NoteUpdateModel:
+def encrypt_note(public_pem: bytes, note: NoteInternalModel | NoteUpdateInternalModel) -> NoteInternalModel | NoteUpdateInternalModel:
 
     note.header = encrypt_data(public_pem, note.header)
     note.text = encrypt_data(public_pem, note.text)
