@@ -137,7 +137,7 @@ def check_access(note_id: int, user_id: int) -> bool:
 
         cursor.execute("""
             SELECT * FROM notes WHERE id = ? AND (from_user_id = ? OR 
-            EXISTS (SELECT 1 FROM accesses WHERE note_id = ? AND user_id = ?))
+            EXISTS (SELECT 1 FROM accesses WHERE note_id = ? AND user_id = ? AND permission = 2))
         """, (note_id, user_id, note_id, user_id))
 
         return bool(cursor.fetchone())

@@ -58,6 +58,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS accesses (
                 note_id INTEGER,
                 user_id INTEGER,
+                permission INTEGER,
                 FOREIGN KEY (note_id) REFERENCES notes(id),
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 PRIMARY KEY (note_id, user_id)
