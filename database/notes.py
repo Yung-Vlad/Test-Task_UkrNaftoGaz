@@ -1,8 +1,9 @@
-import sqlite3
+import sqlite3, base64
 from models.notes import NoteInternalModel, NoteUpdateInternalModel
 from typing import Optional
 
 from .general import DB_PATH
+from .accesses import check_is_owner_of_note
 
 
 def add_note(note: NoteInternalModel, from_user: int) -> None:
@@ -15,9 +16,12 @@ def add_note(note: NoteInternalModel, from_user: int) -> None:
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
 
+        print(len(note.aes_key))
+        key_str = base64.b64encode(note.aes_key).decode()
+
         cursor.execute("""
-            INSERT INTO notes (header, content, tags, created_time, from_user_id) VALUES (?, ?, ?, ?, ?)
-        """, (note.header, note.text, note.tags, note.created_time, from_user))
+            INSERT INTO notes (header, content, tags, aes_key, created_time, from_user_id) VALUES (?, ?, ?, ?, ?, ?)
+        """, (note.header, note.text, note.tags, key_str, note.created_time, from_user))
         conn.commit()
 
         # Increment counter for creating notes
@@ -41,8 +45,15 @@ def get_all_notes(user_id: int, offset: int, limit: int, tags: Optional[str]) ->
 
         # Query and parameters
         query = f"""
-            SELECT * FROM notes WHERE from_user_id = ? OR id IN (SELECT note_id FROM accesses WHERE user_id = ?) 
-            {"AND tags LIKE ? " if tags is not None else ""} ORDER BY id LIMIT ? OFFSET ?
+            SELECT * FROM (
+                SELECT * FROM notes WHERE from_user_id = ? 
+                UNION
+                SELECT id, header, content, tags, accesses.key, from_user_id,
+                    created_time, last_edit_time, last_edit_user 
+                FROM notes 
+                INNER JOIN accesses ON notes.id = accesses.note_id WHERE accesses.user_id = ?
+            )
+            {"WHERE tags LIKE %?%" if tags is not None else ""} ORDER BY id LIMIT ? OFFSET ?
         """
         params = [user_id, user_id, tags, limit, offset]
 
@@ -64,8 +75,9 @@ def get_all_notes(user_id: int, offset: int, limit: int, tags: Optional[str]) ->
         conn.commit()
 
         # Return dictionary in understandable format
-        return { item[0]: { "header": item[1], "content": item[2], "tags": item[3], "from_user_id": item[4],
-                            "created_time": item[5], "last_edit_time": item[6], "last_edit_user": item[7] }
+        return { item[0]: { "header": item[1], "content": item[2], "tags": item[3],
+                            "aes_key": item[4], "from_user_id": item[5],
+                            "created_time": item[6], "last_edit_time": item[7], "last_edit_user": item[8] }
                  for item in data }
 
 def get_note_by_id(note_id: int, user_id: int) -> dict:
@@ -77,8 +89,12 @@ def get_note_by_id(note_id: int, user_id: int) -> dict:
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT * FROM notes WHERE id = ? AND (from_user_id = ? OR 
-            EXISTS (SELECT 1 FROM accesses WHERE note_id = ? AND user_id = ?))
+            SELECT id, header, content, tags, aes_key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
+            WHERE id = ? AND from_user_id = ?
+            UNION
+            SELECT id, header, content, tags, accesses.key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
+            INNER JOIN accesses ON notes.id = accesses.note_id
+            WHERE accesses.note_id = ? AND accesses.user_id = ?
         """, (note_id, user_id, note_id, user_id))
 
         data = cursor.fetchone()
@@ -92,8 +108,27 @@ def get_note_by_id(note_id: int, user_id: int) -> dict:
                         """, (user_id,))
         conn.commit()
 
-        return { "id": data[0], "header": data[1], "content": data[2], "tags": data[3], "from_user_id": data[4],
-                 "created_time": data[5], "last_edit_time": data[6], "last_edit_user": data[7] }
+        return { "id": data[0], "header": data[1], "content": data[2], "tags": data[3], "aes_key": data[4],
+                 "from_user_id": data[5], "created_time": data[6], "last_edit_time": data[7], "last_edit_user": data[8] }
+
+def get_aes_key(note_id: int, user_id: int) -> str:
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+
+        if check_is_owner_of_note(user_id, note_id):
+            cursor.execute("""
+                SELECT aes_key FROM notes WHERE id = ?
+            """, (note_id,))
+        else:
+            cursor.execute("""
+                SELECT key FROM accesses WHERE note_id = ? AND user_id = ?
+            """, (note_id, user_id))
+
+        data = cursor.fetchone()
+        if not data:
+            return "None"
+
+        return data[0]
 
 def delete_note_by_id(note_id: int, user_id: int) -> dict:
     """
@@ -152,7 +187,7 @@ def update_note(note: NoteUpdateInternalModel) -> dict:
 
         cursor.execute("""
             UPDATE notes SET header = ?, content = ?, tags = ?, last_edit_time = ?, last_edit_user = ? WHERE id = ?
-        """, (note.header, note.text, note.tags, note.last_edit_time, note.id, note.last_edit_user))
+        """, (note.header, note.text, note.tags, note.last_edit_time, note.last_edit_user, note.id))
         conn.commit()
 
         return { "message": "Note has successfully updated" }

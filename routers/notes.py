@@ -1,16 +1,18 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 
+import base64
 from typing import Optional
 from datetime import datetime
 
 from secure.tokens import JWT, CSRF
 from models.notes import NoteModel, NoteUpdateModel, NoteInternalModel, NoteUpdateInternalModel
-from cipher.encrypting import encrypt_note
-from cipher.decrypting import decrypt_note
+from cipher.encrypting import symmetric_encrypt_note, encrypt_aes_key
+from cipher.decrypting import decrypt_note, decrypt_aes_key, get_private_key
+from cipher.generate import generate_aes_key
 from database.users import get_public_key
 from database.notes import (add_note, delete_note_by_id,
                             get_all_notes, get_note_by_id,
-                            check_access, update_note)
+                            check_access, update_note, get_aes_key)
 
 
 router = APIRouter(prefix="/notes", tags=["Notes"])
@@ -26,9 +28,10 @@ def create_note(note: NoteModel,
 
     user_id = curr_user["id"]
     public_key = get_public_key(user_id)
-    note = NoteInternalModel(**note.dict(), created_time=datetime.now().strftime("%H:%M:%S %d-%m-%Y"))
+    aes_key = generate_aes_key()
+    note = NoteInternalModel(**note.dict(), aes_key=encrypt_aes_key(public_key, aes_key), created_time=datetime.now().strftime("%H:%M:%S %d-%m-%Y"))
 
-    add_note(encrypt_note(public_key, note), user_id)
+    add_note(symmetric_encrypt_note(aes_key, note), user_id)
 
     return { "message": "Note added successfully" }
 
@@ -54,7 +57,9 @@ def get_notes(curr_user: dict = Depends(JWT.get_current_user),
 
     # Decrypted receiver notes
     for key_note in notes.keys():
-        decrypted_notes.update({ key_note: decrypt_note(notes[key_note], username) })
+        aes_key = base64.b64decode(notes[key_note]["aes_key"])
+        decrypted_notes.update({ key_note: decrypt_note(notes[key_note], username, aes_key) })
+        del decrypted_notes[key_note]["aes_key"]
 
     return { "notes": decrypted_notes }
 
@@ -67,7 +72,12 @@ def get_note(note_id: int,
     username = curr_user["username"]
 
     note = get_note_by_id(note_id, user_id)
-    decrypted_note = decrypt_note(note, username)
+    aes_key = note["aes_key"]
+    if aes_key == "None":  # If no aes_key
+        raise HTTPException(status_code=400, detail="Note not found!")
+
+    decrypted_note = decrypt_note(note, username, base64.b64decode(aes_key))
+    del note["aes_key"]
 
     return { "note": decrypted_note }
 
@@ -79,7 +89,6 @@ def delete_note(note_id: int,
     user_id = curr_user["id"]
 
     return delete_note_by_id(note_id, user_id)
-
 
 @router.put("/edit-note/{note_id}",
             summary="Editing note")
@@ -94,7 +103,12 @@ def editing_note(note: NoteUpdateModel,
         raise HTTPException(status_code=400, detail="Incorrect input of note!")
 
     user_id = curr_user["id"]
-    public_key = get_public_key(user_id)
-    note = NoteUpdateInternalModel(**note.dict(), last_edit_time=datetime.now().strftime("%H:%M:%S %d-%m-%Y"), last_edit_user=user_id)
+    username = curr_user["username"]
 
-    return update_note(encrypt_note(public_key, note))
+    private_key = get_private_key(username)  # Private key of user who want to edit this note
+    note = NoteUpdateInternalModel(**note.dict(), last_edit_time=datetime.now().strftime("%H:%M:%S %d-%m-%Y"), last_edit_user=user_id)
+    aes_key = base64.b64decode(get_aes_key(note.id, user_id))  # Get AES key for accessing to this note
+
+    decrypted_aes_key = decrypt_aes_key(private_key, aes_key)  # Decrypted aes_key
+
+    return update_note(symmetric_encrypt_note(decrypted_aes_key, note))

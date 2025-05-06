@@ -23,3 +23,4 @@ class Permission(str, Enum):
 
 class AccessInternalModel(AccessModel):
     permission: int
+    key: str | bytes | None

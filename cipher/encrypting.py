@@ -1,16 +1,19 @@
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 
+import base64, os
 from models.notes import NoteInternalModel, NoteUpdateInternalModel
 
 
-# Encrypting data by public key
-def encrypt_data(public_pem: bytes, data: str) -> bytes:
+# Encrypting aes_key by public key
+def encrypt_aes_key(public_pem: bytes, key: bytes) -> bytes:
     public_key = serialization.load_pem_public_key(public_pem)  # Load pub_key
 
     # Encrypted data
-    encrypted_data = public_key.encrypt(
-        data.encode(),  # To bytes
+    encrypted_key = public_key.encrypt(
+        key,
         padding.OAEP(
             mgf=padding.MGF1(algorithm=hashes.SHA256()),
             algorithm=hashes.SHA256(),
@@ -18,13 +21,26 @@ def encrypt_data(public_pem: bytes, data: str) -> bytes:
         )
     )
 
-    return encrypted_data
+    return encrypted_key
 
-# Encrypting note
-def encrypt_note(public_pem: bytes, note: NoteInternalModel | NoteUpdateInternalModel) -> NoteInternalModel | NoteUpdateInternalModel:
+def symmetric_encrypt_data(key: bytes, data: str) -> str:
+    iv = os.urandom(12)  # Length of initialize vector
 
-    note.header = encrypt_data(public_pem, note.header)
-    note.text = encrypt_data(public_pem, note.text)
-    note.tags = encrypt_data(public_pem, note.tags)
+    encryptor = Cipher(
+        algorithms.AES(key),
+        modes.GCM(iv),
+        backend=default_backend()
+    ).encryptor()
+
+    data = encryptor.update(data.encode()) + encryptor.finalize()
+
+    return base64.b64encode(iv + encryptor.tag + data).decode()
+
+# Symmetric encrypting note
+def symmetric_encrypt_note(key: bytes, note: NoteInternalModel | NoteUpdateInternalModel) -> NoteInternalModel | NoteUpdateInternalModel:
+
+    note.header = symmetric_encrypt_data(key, note.header)
+    note.text = symmetric_encrypt_data(key, note.text)
+    note.tags = symmetric_encrypt_data(key, note.tags)
 
     return note

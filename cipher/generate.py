@@ -1,14 +1,15 @@
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.ciphers import Cipher
 
-import os
+import os, base64
 from dotenv import load_dotenv
 
 
 load_dotenv()
 KEYS_PATH = os.getenv("KEYS_PATH")
 
-def generate_keys(username: str) -> str:
+def generate_asymmetric_keys(username: str) -> str:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_key = private_key.public_key()
 
@@ -31,6 +32,12 @@ def generate_keys(username: str) -> str:
     )
 
     return public_pem.decode()
+
+def generate_aes_key() -> bytes:
+    aes_key_length = 32  # Length of key
+    key = os.urandom(aes_key_length)
+
+    return key
 
 def create_dir_if_not_exists() -> None:
     if not os.path.exists(KEYS_PATH):

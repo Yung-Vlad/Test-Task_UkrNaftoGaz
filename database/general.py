@@ -34,6 +34,7 @@ def init_db() -> None:
                         header TEXT NOT NULL,
                         content TEXT NOT NULL,
                         tags TEXT,
+                        aes_key TEXT UNIQUE NOT NULL,
                         from_user_id INTEGER NOT NULL,
                         created_time TEXT NOT NULL,
                         last_edit_time TEXT,
@@ -58,7 +59,8 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS accesses (
                 note_id INTEGER,
                 user_id INTEGER,
-                permission INTEGER,
+                permission INTEGER NOT NULL,
+                key TEXT UNIQUE NOT NULL,
                 FOREIGN KEY (note_id) REFERENCES notes(id),
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 PRIMARY KEY (note_id, user_id)

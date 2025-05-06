@@ -2,7 +2,7 @@ import sqlite3
 from models.users import UserCreateModel
 
 from .general import DB_PATH
-from cipher.generate import generate_keys
+from cipher.generate import generate_asymmetric_keys
 
 
 def get_user(username: str) -> dict[str: str] | None:
@@ -29,7 +29,7 @@ def create_user(user: UserCreateModel) -> None:
     """
 
     # Get pub_key
-    public_key = generate_keys(user.username)
+    public_key = generate_asymmetric_keys(user.username)
 
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()

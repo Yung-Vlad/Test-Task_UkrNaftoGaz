@@ -14,8 +14,8 @@ def set_permission(access: AccessInternalModel, owner_id: int) -> dict:
         cursor = conn.cursor()
 
         cursor.execute("""
-            INSERT OR IGNORE INTO accesses (note_id, user_id, permission) VALUES (?, ?, ?)
-        """, (access.note_id, access.user_id, access.permission))
+            INSERT OR IGNORE INTO accesses (note_id, user_id, key, permission) VALUES (?, ?, ?, ?)
+        """, (access.note_id, access.user_id, access.key, access.permission))
 
         if cursor.rowcount == 0:  # If ignore
             return { "message": "This user already has access to this note" }
@@ -23,11 +23,11 @@ def set_permission(access: AccessInternalModel, owner_id: int) -> dict:
         conn.commit()
 
         ##### Send email
-        permission = "read" if access.permission == 1 else "read & write"
-        notify(get_email(access.user_id),
-               make_notification_text({ "email": get_email(owner_id),
-                                        "note_id": access.note_id,
-                                        "permission": f"Gave access to {permission}" }))
+        # permission = "read" if access.permission == 1 else "read & write"
+        # notify(get_email(access.user_id),
+        #        make_notification_text({ "email": get_email(owner_id),
+        #                                 "note_id": access.note_id,
+        #                                 "permission": f"Gave access to {permission}" }))
 
         return { "message": "User successfully gained access" }
 
@@ -48,9 +48,9 @@ def delete_permission(access: AccessModel, owner_id: int) -> dict:
         conn.commit()
 
         ##### Send email
-        notify(get_email(access.user_id), make_notification_text({ "email": get_email(owner_id),
-                                                                       "note_id": access.note_id,
-                                                                       "permission": "Take away access" }))
+        # notify(get_email(access.user_id), make_notification_text({ "email": get_email(owner_id),
+        #                                                                "note_id": access.note_id,
+        #                                                                "permission": "Take away access" }))
 
         return { "message": "User successfully lost access" }
 
@@ -78,11 +78,11 @@ def edit_permission(access: AccessInternalModel, owner_id: int) -> dict:
         conn.commit()
 
         ##### Send email
-        permission = "read" if access.permission == 1 else "read & write"
-        notify(get_email(access.user_id),
-               make_notification_text({ "email": get_email(owner_id),
-                                        "note_id": access.note_id,
-                                        "permission": f"Change your access to {permission}" }))
+        # permission = "read" if access.permission == 1 else "read & write"
+        # notify(get_email(access.user_id),
+        #        make_notification_text({ "email": get_email(owner_id),
+        #                                 "note_id": access.note_id,
+        #                                 "permission": f"Change your access to {permission}" }))
 
         return { "message": "Rights successfully changed" }
 
@@ -106,6 +106,6 @@ def make_notification_text(data: dict) -> str:
 
     note_id = data["note_id"]
     message = (f"From user: {data['email']}\nID note: {note_id}\n"
-            f"Permission: {data['permission']}\nLink: https://NotesAPI/notes/{note_id}")  # (Conditional address)
+            f"Permission: {data['permission']}\nLink: http://127.0.0.1/notes/{note_id}")  # (Conditional address)
 
     return message
